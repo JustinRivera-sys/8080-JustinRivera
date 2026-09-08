@@ -23,6 +23,72 @@ En la enseñanza de la informática y la ingeniería de sistemas, existe una bre
 
 ---
 
+## 🧮 Coprocesador de Punto Flotante (FPU8087) — Integración Conceptual
+
+El Intel 8080 real **nunca tuvo un coprocesador matemático oficial** (el histórico fue el **8087**, compañero del 8086/8088, lanzado años después). Este fork integra, de forma **conceptual y didáctica**, un coprocesador de punto flotante que se comunica con la CPU mediante el propio **bus de E/S del 8080**, usando las instrucciones estándar `IN` (0xDB) y `OUT` (0xD3) — instrucciones que en el emulador original existían pero estaban sin implementar.
+
+Esto respeta la arquitectura real: en el 8080, la comunicación con periféricos externos (impresoras, controladores, coprocesadores) se hacía exactamente así, a través de 256 puertos de 8 bits direccionados con `IN`/`OUT`.
+
+### Mapa de puertos del coprocesador
+
+| Puerto (hex) | Instrucción | Función |
+|---|---|---|
+| `10H`–`13H` | `OUT` | Escribe byte 0–3 (LSB→MSB) del **Operando A** (float32 IEEE-754) |
+| `14H`–`17H` | `OUT` | Escribe byte 0–3 (LSB→MSB) del **Operando B** (float32 IEEE-754) |
+| `18H` | `OUT` | **Comando**: dispara la operación → `01H`=FADD, `02H`=FSUB, `03H`=FMUL, `04H`=FDIV |
+| `19H` | `IN` | **Estado**: bit0=READY (resultado listo), bit1=ERROR (ej. división por cero) |
+| `1AH`–`1DH` | `IN` | Lee byte 0–3 (LSB→MSB) del **Resultado** (float32 IEEE-754) |
+
+### Ejemplo de uso (ensamblador 8080)
+
+```asm
+; Cargar Operando A = 2.5 (00 00 20 40 en IEEE-754)
+MVI A, 00H
+OUT 10H
+MVI A, 00H
+OUT 11H
+MVI A, 20H
+OUT 12H
+MVI A, 40H
+OUT 13H
+
+; Cargar Operando B = 4.5 (00 00 90 40 en IEEE-754)
+MVI A, 00H
+OUT 14H
+MVI A, 00H
+OUT 15H
+MVI A, 90H
+OUT 16H
+MVI A, 40H
+OUT 17H
+
+; Ejecutar FADD (A + B)
+MVI A, 01H
+OUT 18H
+
+; Leer resultado y guardarlo en memoria 3000H
+IN 1AH
+STA 3000H
+IN 1BH
+STA 3001H
+IN 1CH
+STA 3002H
+IN 1DH
+STA 3003H
+
+HLT
+```
+
+Este ejemplo está disponible con un clic usando el botón **"Load FPU Demo"** en la interfaz. El panel **FPU Coprocessor** del dashboard muestra en tiempo real los operandos, la operación ejecutada, el resultado y las banderas de estado (READY/ERROR).
+
+### Archivos involucrados
+
+*   **`fpu.js`** — Clase `FPU8087`: implementa el coprocesador (registros de operandos/resultado, conversión IEEE-754, las 4 operaciones aritméticas y el manejo de errores).
+*   **`cpu.js`** — Métodos `ioRead()`/`ioWrite()` que actúan como el bus de E/S y despachan los puertos `10H`-`1DH` hacia la instancia `this.fpu`.
+*   **`main.js`** — Función `renderFPU()` que sincroniza el panel visual con el estado interno del coprocesador en cada ciclo de la UI.
+
+---
+
 ## 🚀 Novedades de la Versión 2.1.0
 
 Esta versión representa un gran salto adelante en la calidad del entorno de desarrollo web:

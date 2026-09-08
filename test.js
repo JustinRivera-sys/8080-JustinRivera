@@ -152,4 +152,52 @@ runTest('Assembler Rejects Invalid Code & Registers', () => {
     }, /Undefined label/i);
 });
 
+runTest('FPU Coprocessor: FADD via IN/OUT ports (2.5 + 4.5 = 7)', () => {
+    const cpu = new Intel8080();
+
+    function floatBytes(f) {
+        const buf = new ArrayBuffer(4);
+        const view = new DataView(buf);
+        view.setFloat32(0, f, true);
+        return [0, 1, 2, 3].map(i => view.getUint8(i));
+    }
+
+    floatBytes(2.5).forEach((b, i) => cpu.ioWrite(0x10 + i, b)); // Operando A
+    floatBytes(4.5).forEach((b, i) => cpu.ioWrite(0x14 + i, b)); // Operando B
+    cpu.ioWrite(0x18, 0x01); // FADD
+
+    const resBytes = [0, 1, 2, 3].map(i => cpu.ioRead(0x1A + i));
+    const buf = new ArrayBuffer(4);
+    const view = new DataView(buf);
+    resBytes.forEach((b, i) => view.setUint8(i, b));
+
+    assert.strictEqual(view.getFloat32(0, true), 7);
+    assert.strictEqual(cpu.ioRead(0x19) & 0x01, 0x01, 'READY debe estar en 1 tras completar la operacion');
+    assert.strictEqual(cpu.ioRead(0x19) & 0x02, 0, 'ERROR no debe estar activo en una suma valida');
+});
+
+runTest('FPU Coprocessor: FDIV by zero sets ERROR flag', () => {
+    const cpu = new Intel8080();
+
+    function floatBytes(f) {
+        const buf = new ArrayBuffer(4);
+        const view = new DataView(buf);
+        view.setFloat32(0, f, true);
+        return [0, 1, 2, 3].map(i => view.getUint8(i));
+    }
+
+    floatBytes(1.0).forEach((b, i) => cpu.ioWrite(0x10 + i, b));
+    floatBytes(0.0).forEach((b, i) => cpu.ioWrite(0x14 + i, b));
+    cpu.ioWrite(0x18, 0x04); // FDIV
+
+    assert.strictEqual(cpu.ioRead(0x19) & 0x02, 0x02, 'ERROR debe activarse en division por cero');
+});
+
+runTest('FPU Coprocessor: unrelated I/O ports are ignored safely', () => {
+    const cpu = new Intel8080();
+    assert.strictEqual(cpu.ioRead(0x50), 0xFF, 'Puerto no conectado debe devolver 0xFF (bus flotante)');
+    cpu.ioWrite(0x50, 0x99); // No debe lanzar error ni afectar la FPU
+    assert.strictEqual(cpu.fpu.status.ready, true);
+});
+
 console.log('All tests completed successfully!');

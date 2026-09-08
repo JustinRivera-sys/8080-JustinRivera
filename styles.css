@@ -266,3 +266,73 @@ button:disabled {
 .stack-val {
     font-weight: bold;
 }
+
+.fpu {
+    grid-column: span 2;
+}
+
+.fpu-badge {
+    font-size: 0.7rem;
+    font-weight: normal;
+    color: var(--secondary-color);
+    background: #f1f5f9;
+    padding: 2px 8px;
+    border-radius: 9999px;
+    margin-left: 0.5rem;
+    vertical-align: middle;
+}
+
+.fpu-grid {
+    display: grid;
+    grid-template-columns: repeat(4, 1fr);
+    gap: 0.75rem;
+    margin-bottom: 0.75rem;
+}
+
+.fpu-operand, .fpu-op-box {
+    border: 1px solid var(--border-color);
+    border-radius: 4px;
+    background: #f8fafc;
+    text-align: center;
+    padding: 0.5rem 0.25rem;
+}
+
+.fpu-operand span, .fpu-op-box span {
+    display: block;
+    font-size: 0.75rem;
+    color: var(--secondary-color);
+    margin-bottom: 4px;
+}
+
+.fpu-hex {
+    font-family: 'Courier New', Courier, monospace;
+    font-size: 0.85rem;
+    color: var(--secondary-color);
+}
+
+.fpu-val {
+    font-family: 'Courier New', Courier, monospace;
+    font-weight: bold;
+    font-size: 1.1rem;
+}
+
+.fpu-opname {
+    font-family: 'Courier New', Courier, monospace;
+    font-weight: bold;
+    font-size: 1.3rem;
+    color: var(--primary-color);
+}
+
+.fpu-status-row {
+    display: flex;
+    gap: 0.5rem;
+}
+
+.fpu-status-row .flag-box {
+    flex: 1;
+}
+
+.fpu.has-error .fpu-opname,
+.fpu.has-error .fpu-val {
+    color: #dc2626;
+}

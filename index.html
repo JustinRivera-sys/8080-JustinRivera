@@ -27,6 +27,7 @@ HLT"></textarea>
             <div class="controls">
                 <button id="btn-assemble">Assemble & Load</button>
                 <button id="btn-clear-code" class="btn-clear">Clear Code</button>
+                <button id="btn-fpu-demo" class="btn-clear">Load FPU Demo</button>
             </div>
             <div id="assembler-output"></div>
         </section>
@@ -92,10 +93,40 @@ HLT"></textarea>
                     </div>
                     <div id="memory-table"></div>
                 </div>
+
+                <div class="card fpu">
+                    <h3>FPU Coprocessor <span class="fpu-badge">Conceptual — vía IN/OUT (puertos 10H-1DH)</span></h3>
+                    <div class="fpu-grid">
+                        <div class="fpu-operand">
+                            <span>Operando A</span>
+                            <div id="fpu-opa-hex" class="fpu-hex">00 00 00 00</div>
+                            <div id="fpu-opa-val" class="fpu-val">0</div>
+                        </div>
+                        <div class="fpu-operand">
+                            <span>Operando B</span>
+                            <div id="fpu-opb-hex" class="fpu-hex">00 00 00 00</div>
+                            <div id="fpu-opb-val" class="fpu-val">0</div>
+                        </div>
+                        <div class="fpu-op-box">
+                            <span>Operación</span>
+                            <div id="fpu-opname" class="fpu-opname">-</div>
+                        </div>
+                        <div class="fpu-operand">
+                            <span>Resultado</span>
+                            <div id="fpu-res-hex" class="fpu-hex">00 00 00 00</div>
+                            <div id="fpu-res-val" class="fpu-val">0</div>
+                        </div>
+                    </div>
+                    <div class="fpu-status-row">
+                        <div class="flag-box" title="READY: 1 = el coprocesador terminó la última operación y el resultado está disponible."><span>READY</span><div id="fpu-ready">1</div></div>
+                        <div class="flag-box" title="ERROR: 1 = error en la última operación (ej. división por cero)."><span>ERROR</span><div id="fpu-error">0</div></div>
+                    </div>
+                </div>
             </div>
         </section>
     </main>
 
+    <script src="fpu.js"></script>
     <script src="cpu.js"></script>
     <script src="assembler.js"></script>
     <script src="main.js"></script>

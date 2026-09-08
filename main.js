@@ -29,6 +29,41 @@ function updateUI() {
 
     renderMemory();
     renderStack();
+    renderFPU();
+}
+
+function formatBytes(byteArray) {
+    return Array.from(byteArray).map(b => b.toString(16).toUpperCase().padStart(2, '0')).join(' ');
+}
+
+function formatFloat(f) {
+    if (Number.isNaN(f)) return 'NaN';
+    if (!Number.isFinite(f)) return f > 0 ? '+Inf' : '-Inf';
+    // Muestra hasta 6 decimales significativos, sin ceros de más
+    return parseFloat(f.toPrecision(7)).toString();
+}
+
+function renderFPU() {
+    const fpu = cpu.fpu;
+    if (!fpu) return;
+
+    document.getElementById('fpu-opa-hex').textContent = formatBytes(fpu.opA);
+    document.getElementById('fpu-opb-hex').textContent = formatBytes(fpu.opB);
+    document.getElementById('fpu-res-hex').textContent = formatBytes(fpu.result);
+
+    document.getElementById('fpu-opa-val').textContent = formatFloat(fpu.bytesToFloat(fpu.opA));
+    document.getElementById('fpu-opb-val').textContent = formatFloat(fpu.bytesToFloat(fpu.opB));
+    document.getElementById('fpu-res-val').textContent = formatFloat(fpu.lastResult);
+
+    document.getElementById('fpu-opname').textContent = fpu.lastOpName;
+
+    document.getElementById('fpu-ready').textContent = fpu.status.ready ? '1' : '0';
+    document.getElementById('fpu-error').textContent = fpu.status.error ? '1' : '0';
+
+    const fpuCard = document.querySelector('.fpu');
+    if (fpuCard) {
+        fpuCard.classList.toggle('has-error', fpu.status.error);
+    }
 }
 
 function renderStack() {
@@ -122,6 +157,55 @@ document.getElementById('btn-clear-code').addEventListener('click', () => {
     const output = document.getElementById('assembler-output');
     if (output) {
         output.textContent = '';
+        output.className = '';
+    }
+});
+
+document.getElementById('btn-fpu-demo').addEventListener('click', () => {
+    const demo = `; ==========================================================
+; DEMO: Coprocesador de Punto Flotante (FPU8087 conceptual)
+; Calcula 2.5 + 4.5 usando IN/OUT y guarda el resultado en 3000H
+; ==========================================================
+
+; --- Cargar Operando A = 2.5 (IEEE-754: 00 00 20 40) ---
+MVI A, 00H
+OUT 10H
+MVI A, 00H
+OUT 11H
+MVI A, 20H
+OUT 12H
+MVI A, 40H
+OUT 13H
+
+; --- Cargar Operando B = 4.5 (IEEE-754: 00 00 90 40) ---
+MVI A, 00H
+OUT 14H
+MVI A, 00H
+OUT 15H
+MVI A, 90H
+OUT 16H
+MVI A, 40H
+OUT 17H
+
+; --- Disparar operacion FADD (01H = suma) ---
+MVI A, 01H
+OUT 18H
+
+; --- Leer resultado (4 bytes) y guardarlo en memoria 3000H ---
+IN 1AH
+STA 3000H
+IN 1BH
+STA 3001H
+IN 1CH
+STA 3002H
+IN 1DH
+STA 3003H
+
+HLT`;
+    document.getElementById('code-editor').value = demo;
+    const output = document.getElementById('assembler-output');
+    if (output) {
+        output.textContent = 'Demo FPU cargado. Presiona "Assemble & Load" y luego "Run" o "Step".';
         output.className = '';
     }
 });

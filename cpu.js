@@ -1,6 +1,12 @@
+// Soporte para Node.js (tests) y navegador (script clásico) por igual.
+if (typeof module !== 'undefined' && typeof FPU8087 === 'undefined') {
+    global.FPU8087 = require('./fpu.js');
+}
+
 class Intel8080 {
     constructor() {
         this.memory = new Uint8Array(65536);
+        this.fpu = new FPU8087(); // Coprocesador de punto flotante (conceptual)
         this.reset();
     }
 
@@ -26,6 +32,9 @@ class Intel8080 {
         this.halted = false;
         if (this.memory) {
             this.memory.fill(0);
+        }
+        if (this.fpu) {
+            this.fpu.reset();
         }
     }
 
@@ -265,9 +274,9 @@ class Intel8080 {
             case 0x37: this.flags.cy = true; break; // STC
             case 0x3F: this.flags.cy = !this.flags.cy; break; // CMC
 
-            // Special
-            case 0xDB: this.fetch(); break; // IN (Ignored for now)
-            case 0xD3: this.fetch(); break; // OUT (Ignored for now)
+            // Special (E/S - usadas para comunicarse con el coprocesador FPU)
+            case 0xDB: { const port = this.fetch(); this.registers.a = this.ioRead(port); break; } // IN
+            case 0xD3: { const port = this.fetch(); this.ioWrite(port, this.registers.a); break; } // OUT
             case 0xFB: break; // EI
             case 0xF3: break; // DI
         }
@@ -383,6 +392,25 @@ class Intel8080 {
             case 6: return this.readMemory(this.getRP('hl'));
             case 7: return this.registers.a;
         }
+    }
+
+    // --- Bus de E/S (I/O) ---
+    // El 8080 real direcciona periféricos con IN/OUT a través de 256 puertos.
+    // Aquí despachamos el puerto al dispositivo correspondiente; actualmente
+    // solo hay uno conectado: el coprocesador de punto flotante (FPU8087).
+    ioRead(port) {
+        if (this.fpu && this.fpu.handlesPort(port)) {
+            return this.fpu.in(port);
+        }
+        return 0xFF; // Puerto no conectado -> bus flotante (comportamiento típico de hardware real)
+    }
+
+    ioWrite(port, value) {
+        if (this.fpu && this.fpu.handlesPort(port)) {
+            this.fpu.out(port, value);
+            return;
+        }
+        // Puerto no conectado: no-op
     }
 
     setRegByCode(code, val) {
