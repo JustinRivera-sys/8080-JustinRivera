@@ -25,67 +25,37 @@ En la enseñanza de la informática y la ingeniería de sistemas, existe una bre
 
 ## 🧮 Coprocesador de Punto Flotante (FPU8087) — Integración Conceptual
 
-El Intel 8080 real **nunca tuvo un coprocesador matemático oficial** (el histórico fue el **8087**, compañero del 8086/8088, lanzado años después). Este fork integra, de forma **conceptual y didáctica**, un coprocesador de punto flotante que se comunica con la CPU mediante el propio **bus de E/S del 8080**, usando las instrucciones estándar `IN` (0xDB) y `OUT` (0xD3) — instrucciones que en el emulador original existían pero estaban sin implementar.
+El Intel 8080 real **nunca tuvo un coprocesador matemático oficial** (el histórico fue el **8087**, compañero del 8086/8088, lanzado años después). Este fork integra, de forma **conceptual y didáctica**, un coprocesador de punto flotante que **comparte la misma memoria** que la CPU (memoria compartida / *memory-mapped I/O*): no existe un canal de comunicación separado — ambos dispositivos leen y escriben las mismas celdas del arreglo de 64KB de memoria RAM.
 
-Esto respeta la arquitectura real: en el 8080, la comunicación con periféricos externos (impresoras, controladores, coprocesadores) se hacía exactamente así, a través de 256 puertos de 8 bits direccionados con `IN`/`OUT`.
+La CPU "avisa" al coprocesador escribiendo en una dirección de memoria reservada como **comando**. En ese instante, el coprocesador reacciona: lee los operandos desde la memoria compartida, calcula el resultado, y lo deja en otra sección de esa misma memoria para que la CPU lo lea después con una simple instrucción `LDA`, exactamente igual que leería cualquier otro dato.
 
-### Mapa de puertos del coprocesador
+### Mapa de memoria compartida (CPU ↔ Coprocesador)
 
-| Puerto (hex) | Instrucción | Función |
+| Dirección | Quién escribe | Función |
 |---|---|---|
-| `10H`–`13H` | `OUT` | Escribe byte 0–3 (LSB→MSB) del **Operando A** (float32 IEEE-754) |
-| `14H`–`17H` | `OUT` | Escribe byte 0–3 (LSB→MSB) del **Operando B** (float32 IEEE-754) |
-| `18H` | `OUT` | **Comando**: dispara la operación → `01H`=FADD, `02H`=FSUB, `03H`=FMUL, `04H`=FDIV |
-| `19H` | `IN` | **Estado**: bit0=READY (resultado listo), bit1=ERROR (ej. división por cero) |
-| `1AH`–`1DH` | `IN` | Lee byte 0–3 (LSB→MSB) del **Resultado** (float32 IEEE-754) |
+| `9000H`–`9003H` | CPU | **Operando A** (float32 IEEE-754, little-endian) |
+| `9004H`–`9007H` | CPU | **Operando B** (float32 IEEE-754, little-endian) |
+| `9008H` | CPU | **Comando** — escribir aquí **dispara** la operación → `01H`=FADD, `02H`=FSUB, `03H`=FMUL, `04H`=FDIV |
+| `9009H` | Coprocesador | **Estado** — bit0=READY (resultado listo), bit1=ERROR (ej. división por cero) |
+| `900AH`–`900DH` | Coprocesador | **Resultado** (float32 IEEE-754, little-endian) |
+| `900EH` | Coprocesador | **Resultado entero truncado** (0–255) — para que el 8080, que solo maneja enteros de 8 bits, lo pueda sumar directamente |
+| `900FH` | CPU | **Total entero acumulado** por el programa 8080 (no lo toca el coprocesador) |
 
-### Ejemplo de uso (ensamblador 8080)
+### El flujo completo: cómo "saltan" los datos entre CPU y coprocesador
 
-```asm
-; Cargar Operando A = 2.5 (00 00 20 40 en IEEE-754)
-MVI A, 00H
-OUT 10H
-MVI A, 00H
-OUT 11H
-MVI A, 20H
-OUT 12H
-MVI A, 40H
-OUT 13H
+1. La CPU escribe los 4 bytes del Operando A en `9000H`-`9003H` (instrucciones `MVI`+`STA`).
+2. La CPU escribe los 4 bytes del Operando B en `9004H`-`9007H`.
+3. La CPU escribe el código de operación en `9008H` (ej. `01H` = sumar). **Este escribe es el "salto" clave**: al compartir memoria, el coprocesador detecta esa escritura y toma el control de inmediato — lee los 8 bytes de operandos, calcula, y escribe el resultado en `900AH`-`900EH`.
+4. La CPU salta a leer `900EH` (la parte entera del resultado) con `LDA`.
+5. La CPU suma ese valor a un total entero que ya llevaba (guardado en `900FH`) usando `ADD`, y guarda el nuevo total de vuelta en `900FH` con `STA`.
 
-; Cargar Operando B = 4.5 (00 00 90 40 en IEEE-754)
-MVI A, 00H
-OUT 14H
-MVI A, 00H
-OUT 15H
-MVI A, 90H
-OUT 16H
-MVI A, 40H
-OUT 17H
-
-; Ejecutar FADD (A + B)
-MVI A, 01H
-OUT 18H
-
-; Leer resultado y guardarlo en memoria 3000H
-IN 1AH
-STA 3000H
-IN 1BH
-STA 3001H
-IN 1CH
-STA 3002H
-IN 1DH
-STA 3003H
-
-HLT
-```
-
-Este ejemplo está disponible con un clic usando el botón **"Load FPU Demo"** en la interfaz. El panel **FPU Coprocessor** del dashboard muestra en tiempo real los operandos, la operación ejecutada, el resultado y las banderas de estado (READY/ERROR).
+Este ejemplo está disponible con un clic usando el botón **"Load FPU Demo"**, que calcula `10.01 + 10.02 = 20.03`, toma la parte entera (`20`) y la suma a un total que ya valía `5`, dando `25` como resultado final. El panel **FPU Coprocessor** del dashboard muestra en tiempo real los operandos, la operación, el resultado (float y entero) y el total acumulado por la CPU. Además, incluye botones de salto rápido (Operando A, Operando B, Comando/Estado, Resultado, Total) que llevan el **Memory View** directamente a cada segmento de memoria compartida, y esa zona (`9000H`-`900FH`) se resalta visualmente en el mapa de memoria.
 
 ### Archivos involucrados
 
-*   **`fpu.js`** — Clase `FPU8087`: implementa el coprocesador (registros de operandos/resultado, conversión IEEE-754, las 4 operaciones aritméticas y el manejo de errores).
-*   **`cpu.js`** — Métodos `ioRead()`/`ioWrite()` que actúan como el bus de E/S y despachan los puertos `10H`-`1DH` hacia la instancia `this.fpu`.
-*   **`main.js`** — Función `renderFPU()` que sincroniza el panel visual con el estado interno del coprocesador en cada ciclo de la UI.
+*   **`fpu.js`** — Clase `FPU8087`: recibe una **referencia directa** al mismo arreglo de memoria (`Uint8Array`) que usa la CPU. Implementa la lectura/escritura de floats IEEE-754 sobre esa memoria compartida, las 4 operaciones aritméticas, y el manejo de errores.
+*   **`cpu.js`** — El método `writeMemory()` (usado por toda instrucción que escribe en RAM) detecta cuándo la CPU escribió en la dirección de comando (`9008H`) y en ese momento invoca `this.fpu.compute()`. No hay un mecanismo de E/S aparte: es la memoria compartida la que dispara la comunicación.
+*   **`main.js`** — Función `renderFPU()` que lee los valores directamente de la memoria compartida y los sincroniza con el panel visual; también maneja los botones de salto rápido a cada segmento de memoria.
 
 ---
 

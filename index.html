@@ -95,24 +95,32 @@ HLT"></textarea>
                 </div>
 
                 <div class="card fpu">
-                    <h3>FPU Coprocessor <span class="fpu-badge">Conceptual — vía IN/OUT (puertos 10H-1DH)</span></h3>
+                    <h3>FPU Coprocessor <span class="fpu-badge">Conceptual — memoria compartida con la CPU (9000H-900FH)</span></h3>
+                    <p class="fpu-explainer">La CPU y el coprocesador leen y escriben las mismas celdas de memoria. La CPU escribe los operandos y el comando; el coprocesador calcula y deja el resultado en otra sección de esa misma memoria para que la CPU lo lea después.</p>
+                    <div class="fpu-jump-row">
+                        <button class="fpu-jump-btn" data-addr="9000">Operando A (9000H)</button>
+                        <button class="fpu-jump-btn" data-addr="9004">Operando B (9004H)</button>
+                        <button class="fpu-jump-btn" data-addr="9008">Comando/Estado (9008H)</button>
+                        <button class="fpu-jump-btn" data-addr="900A">Resultado (900AH)</button>
+                        <button class="fpu-jump-btn" data-addr="900F">Total Entero (900FH)</button>
+                    </div>
                     <div class="fpu-grid">
                         <div class="fpu-operand">
-                            <span>Operando A</span>
+                            <span>Operando A <em>9000H</em></span>
                             <div id="fpu-opa-hex" class="fpu-hex">00 00 00 00</div>
                             <div id="fpu-opa-val" class="fpu-val">0</div>
                         </div>
                         <div class="fpu-operand">
-                            <span>Operando B</span>
+                            <span>Operando B <em>9004H</em></span>
                             <div id="fpu-opb-hex" class="fpu-hex">00 00 00 00</div>
                             <div id="fpu-opb-val" class="fpu-val">0</div>
                         </div>
                         <div class="fpu-op-box">
-                            <span>Operación</span>
+                            <span>Operación <em>9008H</em></span>
                             <div id="fpu-opname" class="fpu-opname">-</div>
                         </div>
                         <div class="fpu-operand">
-                            <span>Resultado</span>
+                            <span>Resultado <em>900AH</em></span>
                             <div id="fpu-res-hex" class="fpu-hex">00 00 00 00</div>
                             <div id="fpu-res-val" class="fpu-val">0</div>
                         </div>
@@ -120,6 +128,8 @@ HLT"></textarea>
                     <div class="fpu-status-row">
                         <div class="flag-box" title="READY: 1 = el coprocesador terminó la última operación y el resultado está disponible."><span>READY</span><div id="fpu-ready">1</div></div>
                         <div class="flag-box" title="ERROR: 1 = error en la última operación (ej. división por cero)."><span>ERROR</span><div id="fpu-error">0</div></div>
+                        <div class="flag-box" title="Parte entera truncada del resultado (900EH), lista para que el 8080 la sume."><span>RESULTADO ENTERO</span><div id="fpu-res-int">0</div></div>
+                        <div class="flag-box" title="Total entero acumulado por el programa 8080 (900FH), despues de sumar el resultado del coprocesador."><span>TOTAL ENTERO (CPU)</span><div id="fpu-total">0</div></div>
                     </div>
                 </div>
             </div>

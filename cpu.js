@@ -6,7 +6,7 @@ if (typeof module !== 'undefined' && typeof FPU8087 === 'undefined') {
 class Intel8080 {
     constructor() {
         this.memory = new Uint8Array(65536);
-        this.fpu = new FPU8087(); // Coprocesador de punto flotante (conceptual)
+        this.fpu = new FPU8087(this.memory); // Coprocesador de punto flotante (memoria compartida)
         this.reset();
     }
 
@@ -110,7 +110,17 @@ class Intel8080 {
     }
 
     writeMemory(addr, val) {
-        this.memory[addr & 0xFFFF] = val & 0xFF;
+        addr &= 0xFFFF;
+        val &= 0xFF;
+        this.memory[addr] = val;
+
+        // Memoria compartida CPU <-> Coprocesador: si la CPU acaba de escribir
+        // en la direccion de "comando" (9008H), el coprocesador reacciona de
+        // inmediato, leyendo los operandos y dejando el resultado en otra
+        // seccion de esta MISMA memoria (900AH en adelante).
+        if (this.fpu && this.fpu.isTriggerAddress(addr)) {
+            this.fpu.compute(val);
+        }
     }
 
     fetch() {
@@ -274,9 +284,9 @@ class Intel8080 {
             case 0x37: this.flags.cy = true; break; // STC
             case 0x3F: this.flags.cy = !this.flags.cy; break; // CMC
 
-            // Special (E/S - usadas para comunicarse con el coprocesador FPU)
-            case 0xDB: { const port = this.fetch(); this.registers.a = this.ioRead(port); break; } // IN
-            case 0xD3: { const port = this.fetch(); this.ioWrite(port, this.registers.a); break; } // OUT
+            // Special
+            case 0xDB: this.fetch(); break; // IN (no usado en este diseño de memoria compartida)
+            case 0xD3: this.fetch(); break; // OUT (no usado en este diseño de memoria compartida)
             case 0xFB: break; // EI
             case 0xF3: break; // DI
         }
@@ -392,25 +402,6 @@ class Intel8080 {
             case 6: return this.readMemory(this.getRP('hl'));
             case 7: return this.registers.a;
         }
-    }
-
-    // --- Bus de E/S (I/O) ---
-    // El 8080 real direcciona periféricos con IN/OUT a través de 256 puertos.
-    // Aquí despachamos el puerto al dispositivo correspondiente; actualmente
-    // solo hay uno conectado: el coprocesador de punto flotante (FPU8087).
-    ioRead(port) {
-        if (this.fpu && this.fpu.handlesPort(port)) {
-            return this.fpu.in(port);
-        }
-        return 0xFF; // Puerto no conectado -> bus flotante (comportamiento típico de hardware real)
-    }
-
-    ioWrite(port, value) {
-        if (this.fpu && this.fpu.handlesPort(port)) {
-            this.fpu.out(port, value);
-            return;
-        }
-        // Puerto no conectado: no-op
     }
 
     setRegByCode(code, val) {

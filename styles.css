@@ -336,3 +336,46 @@ button:disabled {
 .fpu.has-error .fpu-val {
     color: #dc2626;
 }
+
+.fpu-explainer {
+    font-size: 0.82rem;
+    color: var(--secondary-color);
+    margin: 0 0 0.75rem 0;
+    line-height: 1.4;
+}
+
+.fpu-jump-row {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.4rem;
+    margin-bottom: 0.75rem;
+}
+
+.fpu-jump-btn {
+    font-size: 0.75rem;
+    padding: 4px 10px;
+    border: 1px solid var(--primary-color);
+    background: #fff;
+    color: var(--primary-color);
+    border-radius: 9999px;
+    cursor: pointer;
+    transition: background 0.15s, color 0.15s;
+}
+
+.fpu-jump-btn:hover {
+    background: var(--primary-color);
+    color: #fff;
+}
+
+.fpu-operand span em,
+.fpu-op-box span em {
+    font-style: normal;
+    font-weight: normal;
+    color: var(--primary-color);
+    font-size: 0.7rem;
+}
+
+.mem-cell.mem-fpu-zone {
+    outline: 2px solid var(--primary-color);
+    outline-offset: -2px;
+}

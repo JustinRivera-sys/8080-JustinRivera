@@ -47,23 +47,39 @@ function renderFPU() {
     const fpu = cpu.fpu;
     if (!fpu) return;
 
-    document.getElementById('fpu-opa-hex').textContent = formatBytes(fpu.opA);
-    document.getElementById('fpu-opb-hex').textContent = formatBytes(fpu.opB);
-    document.getElementById('fpu-res-hex').textContent = formatBytes(fpu.result);
+    const opaBytes = [0, 1, 2, 3].map(i => cpu.readMemory(fpu.ADDR_OPA + i));
+    const opbBytes = [0, 1, 2, 3].map(i => cpu.readMemory(fpu.ADDR_OPB + i));
+    const resBytes = [0, 1, 2, 3].map(i => cpu.readMemory(fpu.ADDR_RESULT + i));
 
-    document.getElementById('fpu-opa-val').textContent = formatFloat(fpu.bytesToFloat(fpu.opA));
-    document.getElementById('fpu-opb-val').textContent = formatFloat(fpu.bytesToFloat(fpu.opB));
-    document.getElementById('fpu-res-val').textContent = formatFloat(fpu.lastResult);
+    document.getElementById('fpu-opa-hex').textContent = formatBytes(opaBytes);
+    document.getElementById('fpu-opb-hex').textContent = formatBytes(opbBytes);
+    document.getElementById('fpu-res-hex').textContent = formatBytes(resBytes);
+
+    document.getElementById('fpu-opa-val').textContent = formatFloat(fpu.readFloat(fpu.ADDR_OPA));
+    document.getElementById('fpu-opb-val').textContent = formatFloat(fpu.readFloat(fpu.ADDR_OPB));
+    document.getElementById('fpu-res-val').textContent = formatFloat(fpu.readFloat(fpu.ADDR_RESULT));
 
     document.getElementById('fpu-opname').textContent = fpu.lastOpName;
 
-    document.getElementById('fpu-ready').textContent = fpu.status.ready ? '1' : '0';
-    document.getElementById('fpu-error').textContent = fpu.status.error ? '1' : '0';
+    const status = cpu.readMemory(fpu.ADDR_STATUS);
+    document.getElementById('fpu-ready').textContent = (status & 0x01) ? '1' : '0';
+    document.getElementById('fpu-error').textContent = (status & 0x02) ? '1' : '0';
+    document.getElementById('fpu-res-int').textContent = cpu.readMemory(fpu.ADDR_RESULT_INT);
+    document.getElementById('fpu-total').textContent = cpu.readMemory(fpu.ADDR_TOTAL);
 
     const fpuCard = document.querySelector('.fpu');
     if (fpuCard) {
-        fpuCard.classList.toggle('has-error', fpu.status.error);
+        fpuCard.classList.toggle('has-error', !!(status & 0x02));
     }
+}
+
+function setMemoryStart(addr) {
+    memoryStart = addr & 0xFFFF;
+    const memStartInput = document.getElementById('mem-start-addr');
+    if (memStartInput) {
+        memStartInput.value = memoryStart.toString(16).toUpperCase().padStart(4, '0');
+    }
+    renderMemory();
 }
 
 function renderStack() {
@@ -131,6 +147,10 @@ function renderMemory() {
             const c = document.createElement('div');
             c.className = 'mem-cell';
             if (cellAddr === cpu.registers.pc) c.style.backgroundColor = '#fde047';
+            if (cpu.fpu && cellAddr >= 0x9000 && cellAddr <= 0x900F) {
+                c.classList.add('mem-fpu-zone');
+                c.title = 'Zona de memoria compartida con el coprocesador FPU';
+            }
             c.textContent = cpu.readMemory(cellAddr).toString(16).toUpperCase().padStart(2, '0');
             table.appendChild(c);
         }
@@ -163,51 +183,66 @@ document.getElementById('btn-clear-code').addEventListener('click', () => {
 
 document.getElementById('btn-fpu-demo').addEventListener('click', () => {
     const demo = `; ==========================================================
-; DEMO: Coprocesador de Punto Flotante (FPU8087 conceptual)
-; Calcula 2.5 + 4.5 usando IN/OUT y guarda el resultado en 3000H
+; DEMO: Coprocesador de Punto Flotante (memoria compartida)
+; El 8080 y el coprocesador comparten la misma memoria (9000H-900FH).
+; Calcula 10.01 + 10.02 con el coprocesador, y el 8080 toma la parte
+; entera del resultado (20) y la suma a un total entero que ya tenia (5).
+; Total final esperado = 5 + 20 = 25
 ; ==========================================================
 
-; --- Cargar Operando A = 2.5 (IEEE-754: 00 00 20 40) ---
-MVI A, 00H
-OUT 10H
-MVI A, 00H
-OUT 11H
+; --- El 8080 ya tenia un total acumulado = 5 (900FH) ---
+MVI A, 05H
+STA 900FH
+
+; --- Escribir Operando A = 10.01 en 9000H-9003H (IEEE-754: F6 28 20 41) ---
+MVI A, 0F6H
+STA 9000H
+MVI A, 28H
+STA 9001H
 MVI A, 20H
-OUT 12H
-MVI A, 40H
-OUT 13H
+STA 9002H
+MVI A, 41H
+STA 9003H
 
-; --- Cargar Operando B = 4.5 (IEEE-754: 00 00 90 40) ---
-MVI A, 00H
-OUT 14H
-MVI A, 00H
-OUT 15H
-MVI A, 90H
-OUT 16H
-MVI A, 40H
-OUT 17H
+; --- Escribir Operando B = 10.02 en 9004H-9007H (IEEE-754: EC 51 20 41) ---
+MVI A, 0ECH
+STA 9004H
+MVI A, 51H
+STA 9005H
+MVI A, 20H
+STA 9006H
+MVI A, 41H
+STA 9007H
 
-; --- Disparar operacion FADD (01H = suma) ---
+; --- Escribir el comando en 9008H: esto DISPARA al coprocesador ---
+; El coprocesador lee 9000H-9007H, calcula 10.01 + 10.02 = 20.03,
+; y deja el resultado en 900AH-900DH y su parte entera (20) en 900EH.
 MVI A, 01H
-OUT 18H
+STA 9008H
 
-; --- Leer resultado (4 bytes) y guardarlo en memoria 3000H ---
-IN 1AH
-STA 3000H
-IN 1BH
-STA 3001H
-IN 1CH
-STA 3002H
-IN 1DH
-STA 3003H
+; --- El 8080 lee la parte entera del resultado del coprocesador ---
+LDA 900EH
+MOV B, A
+
+; --- Y la suma al total entero que ya llevaba ---
+LDA 900FH
+ADD B
+STA 900FH   ; Total final = 5 + 20 = 25
 
 HLT`;
     document.getElementById('code-editor').value = demo;
     const output = document.getElementById('assembler-output');
     if (output) {
-        output.textContent = 'Demo FPU cargado. Presiona "Assemble & Load" y luego "Run" o "Step".';
+        output.textContent = 'Demo FPU (memoria compartida) cargado. Presiona "Assemble & Load" y luego "Run" o "Step".';
         output.className = '';
     }
+});
+
+document.querySelectorAll('.fpu-jump-btn').forEach(btn => {
+    btn.addEventListener('click', () => {
+        const addr = parseInt(btn.getAttribute('data-addr'), 16);
+        setMemoryStart(addr);
+    });
 });
 
 document.getElementById('btn-step').addEventListener('click', () => {

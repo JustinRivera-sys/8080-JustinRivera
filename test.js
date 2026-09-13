@@ -152,7 +152,7 @@ runTest('Assembler Rejects Invalid Code & Registers', () => {
     }, /Undefined label/i);
 });
 
-runTest('FPU Coprocessor: FADD via IN/OUT ports (2.5 + 4.5 = 7)', () => {
+runTest('FPU Coprocessor: FADD via memoria compartida (10.01 + 10.02 = 20.03)', () => {
     const cpu = new Intel8080();
 
     function floatBytes(f) {
@@ -162,21 +162,22 @@ runTest('FPU Coprocessor: FADD via IN/OUT ports (2.5 + 4.5 = 7)', () => {
         return [0, 1, 2, 3].map(i => view.getUint8(i));
     }
 
-    floatBytes(2.5).forEach((b, i) => cpu.ioWrite(0x10 + i, b)); // Operando A
-    floatBytes(4.5).forEach((b, i) => cpu.ioWrite(0x14 + i, b)); // Operando B
-    cpu.ioWrite(0x18, 0x01); // FADD
+    floatBytes(10.01).forEach((b, i) => cpu.writeMemory(0x9000 + i, b)); // Operando A
+    floatBytes(10.02).forEach((b, i) => cpu.writeMemory(0x9004 + i, b)); // Operando B
+    cpu.writeMemory(0x9008, 0x01); // Disparar FADD escribiendo en la memoria compartida
 
-    const resBytes = [0, 1, 2, 3].map(i => cpu.ioRead(0x1A + i));
+    const resBytes = [0, 1, 2, 3].map(i => cpu.readMemory(0x900A + i));
     const buf = new ArrayBuffer(4);
     const view = new DataView(buf);
     resBytes.forEach((b, i) => view.setUint8(i, b));
 
-    assert.strictEqual(view.getFloat32(0, true), 7);
-    assert.strictEqual(cpu.ioRead(0x19) & 0x01, 0x01, 'READY debe estar en 1 tras completar la operacion');
-    assert.strictEqual(cpu.ioRead(0x19) & 0x02, 0, 'ERROR no debe estar activo en una suma valida');
+    assert.ok(Math.abs(view.getFloat32(0, true) - 20.03) < 0.001);
+    assert.strictEqual(cpu.readMemory(0x900E), 20, 'La parte entera truncada del resultado debe ser 20');
+    assert.strictEqual(cpu.readMemory(0x9009) & 0x01, 0x01, 'READY debe estar en 1 tras completar la operacion');
+    assert.strictEqual(cpu.readMemory(0x9009) & 0x02, 0, 'ERROR no debe estar activo en una suma valida');
 });
 
-runTest('FPU Coprocessor: FDIV by zero sets ERROR flag', () => {
+runTest('FPU Coprocessor: FDIV entre cero activa la bandera ERROR', () => {
     const cpu = new Intel8080();
 
     function floatBytes(f) {
@@ -186,18 +187,59 @@ runTest('FPU Coprocessor: FDIV by zero sets ERROR flag', () => {
         return [0, 1, 2, 3].map(i => view.getUint8(i));
     }
 
-    floatBytes(1.0).forEach((b, i) => cpu.ioWrite(0x10 + i, b));
-    floatBytes(0.0).forEach((b, i) => cpu.ioWrite(0x14 + i, b));
-    cpu.ioWrite(0x18, 0x04); // FDIV
+    floatBytes(1.0).forEach((b, i) => cpu.writeMemory(0x9000 + i, b));
+    floatBytes(0.0).forEach((b, i) => cpu.writeMemory(0x9004 + i, b));
+    cpu.writeMemory(0x9008, 0x04); // FDIV
 
-    assert.strictEqual(cpu.ioRead(0x19) & 0x02, 0x02, 'ERROR debe activarse en division por cero');
+    assert.strictEqual(cpu.readMemory(0x9009) & 0x02, 0x02, 'ERROR debe activarse en division por cero');
 });
 
-runTest('FPU Coprocessor: unrelated I/O ports are ignored safely', () => {
+runTest('FPU Coprocessor: el 8080 puede leer el resultado y sumarlo a un entero (memoria compartida real)', () => {
     const cpu = new Intel8080();
-    assert.strictEqual(cpu.ioRead(0x50), 0xFF, 'Puerto no conectado debe devolver 0xFF (bus flotante)');
-    cpu.ioWrite(0x50, 0x99); // No debe lanzar error ni afectar la FPU
-    assert.strictEqual(cpu.fpu.status.ready, true);
+    const Assembler8080 = require('./assembler.js');
+    const assembler = new Assembler8080();
+
+    const source = `
+        MVI A, 05H
+        STA 900FH
+        MVI A, 0F6H
+        STA 9000H
+        MVI A, 28H
+        STA 9001H
+        MVI A, 20H
+        STA 9002H
+        MVI A, 41H
+        STA 9003H
+        MVI A, 0ECH
+        STA 9004H
+        MVI A, 51H
+        STA 9005H
+        MVI A, 20H
+        STA 9006H
+        MVI A, 41H
+        STA 9007H
+        MVI A, 01H
+        STA 9008H
+        LDA 900EH
+        MOV B, A
+        LDA 900FH
+        ADD B
+        STA 900FH
+        HLT
+    `;
+
+    const result = assembler.assemble(source);
+    cpu.memory.set(result.binary);
+
+    let steps = 0;
+    while (!cpu.halted && steps < 1000) {
+        cpu.step();
+        steps++;
+    }
+
+    // El coprocesador calculo 10.01 + 10.02 = 20.03 -> parte entera 20
+    // El 8080 ya tenia un total de 5, y le suma los 20 -> 25
+    assert.strictEqual(cpu.readMemory(0x900F), 25, 'El total final en memoria compartida debe ser 5 + 20 = 25');
 });
 
 console.log('All tests completed successfully!');
