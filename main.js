@@ -181,52 +181,6 @@ document.getElementById('btn-clear-code').addEventListener('click', () => {
     }
 });
 
-document.getElementById('btn-fpu-demo').addEventListener('click', () => {
-    const demo = `; Coprocesador FPU - memoria compartida 9000H-900FH
-; 10.01 + 10.02, resultado entero + total previo = 25
-
-MVI A, 05H
-STA 900FH
-
-; Operando A = 10.01 (F6 28 20 41)
-MVI A, 0F6H
-STA 9000H
-MVI A, 28H
-STA 9001H
-MVI A, 20H
-STA 9002H
-MVI A, 41H
-STA 9003H
-
-; Operando B = 10.02 (EC 51 20 41)
-MVI A, 0ECH
-STA 9004H
-MVI A, 51H
-STA 9005H
-MVI A, 20H
-STA 9006H
-MVI A, 41H
-STA 9007H
-
-; comando -> dispara la FPU
-MVI A, 01H
-STA 9008H
-
-LDA 900EH
-MOV B, A
-LDA 900FH
-ADD B
-STA 900FH
-
-HLT`;
-    document.getElementById('code-editor').value = demo;
-    const output = document.getElementById('assembler-output');
-    if (output) {
-        output.textContent = 'Demo cargado. Assemble & Load y luego Run o Step.';
-        output.className = '';
-    }
-});
-
 document.querySelectorAll('.fpu-jump-btn').forEach(btn => {
     btn.addEventListener('click', () => {
         const addr = parseInt(btn.getAttribute('data-addr'), 16);
