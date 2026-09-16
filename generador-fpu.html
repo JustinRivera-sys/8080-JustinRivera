@@ -1,0 +1,268 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Generador de código 8080</title>
+<style>
+    :root {
+        --primary-color: #2563eb;
+        --secondary-color: #64748b;
+        --border-color: #e2e8f0;
+        --bg-color: #f8fafc;
+        --card-bg: #ffffff;
+    }
+    * { box-sizing: border-box; }
+    body {
+        font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+        background: var(--bg-color);
+        color: #1e293b;
+        margin: 0;
+        padding: 1.5rem;
+    }
+    .wrap {
+        max-width: 720px;
+        margin: 0 auto;
+    }
+    h1 {
+        font-size: 1.3rem;
+        margin-bottom: 0.25rem;
+    }
+    .sub {
+        color: var(--secondary-color);
+        font-size: 0.85rem;
+        margin-bottom: 1.25rem;
+    }
+    .card {
+        background: var(--card-bg);
+        border: 1px solid var(--border-color);
+        border-radius: 8px;
+        padding: 1rem 1.25rem;
+        margin-bottom: 1rem;
+    }
+    .row {
+        display: flex;
+        gap: 0.75rem;
+        flex-wrap: wrap;
+    }
+    .field {
+        flex: 1;
+        min-width: 140px;
+    }
+    label {
+        display: block;
+        font-size: 0.78rem;
+        color: var(--secondary-color);
+        margin-bottom: 4px;
+    }
+    input, select {
+        width: 100%;
+        padding: 8px 10px;
+        border: 1px solid var(--border-color);
+        border-radius: 6px;
+        font-size: 0.95rem;
+    }
+    button {
+        background: var(--primary-color);
+        color: #fff;
+        border: none;
+        padding: 10px 18px;
+        border-radius: 6px;
+        font-size: 0.9rem;
+        cursor: pointer;
+        margin-top: 0.9rem;
+    }
+    button:hover { background: #1d4ed8; }
+    .btn-copy {
+        background: var(--secondary-color);
+        margin-left: 0.5rem;
+    }
+    .btn-copy:hover { background: #475569; }
+    pre {
+        background: #0f172a;
+        color: #e2e8f0;
+        padding: 1rem;
+        border-radius: 8px;
+        font-size: 0.82rem;
+        overflow-x: auto;
+        white-space: pre-wrap;
+        line-height: 1.5;
+    }
+    .summary {
+        font-size: 0.85rem;
+        color: var(--secondary-color);
+        margin-top: 0.6rem;
+    }
+    .summary b { color: #1e293b; }
+    .error {
+        color: #dc2626;
+        font-size: 0.85rem;
+        margin-top: 0.5rem;
+    }
+    .hidden { display: none; }
+</style>
+</head>
+<body>
+<div class="wrap">
+    <h1>Generador de código para el (8080)</h1>
+    <p class="sub">Ingresa A, B, la operación (memoria compartida 9000H-900FH).</p>
+
+    <div class="card">
+        <div class="row">
+            <div class="field">
+                <label>Valor A</label>
+                <input type="text" id="valA" value="10.01">
+            </div>
+            <div class="field">
+                <label>Valor B</label>
+                <input type="text" id="valB" value="10.02">
+            </div>
+        </div>
+        <div class="row" style="margin-top:0.75rem;">
+            <div class="field">
+                <label>Operación</label>
+                <select id="op">
+                    <option value="01">Suma (A + B)</option>
+                    <option value="02">Resta (A - B)</option>
+                    <option value="03">Multiplicación (A * B)</option>
+                    <option value="04">División (A / B)</option>
+                </select>
+            </div>
+            <div class="field">
+                <label>Total entero que ya tiene el 8080</label>
+                <input type="text" id="totalPrev" value="0">
+            </div>
+        </div>
+        <button id="btnGen">Generar código</button>
+        <div id="errBox" class="error hidden"></div>
+    </div>
+
+    <div class="card hidden" id="resultCard">
+        <pre id="output"></pre>
+        <button id="btnCopy" class="btn-copy">Copiar código</button>
+        <div class="summary" id="summary"></div>
+    </div>
+</div>
+
+<script>
+function floatToBytes(f) {
+    const buf = new ArrayBuffer(4);
+    const view = new DataView(buf);
+    view.setFloat32(0, f, true);
+    const out = [];
+    for (let i = 0; i < 4; i++) out.push(view.getUint8(i));
+    return out;
+}
+
+function hx(n) {
+    return n.toString(16).toUpperCase().padStart(2, '0');
+}
+
+function genBlock(bytes, baseAddr) {
+    const lines = [];
+    for (let i = 0; i < 4; i++) {
+        const addr = (baseAddr + i).toString(16).toUpperCase();
+        const b = hx(bytes[i]);
+        const needsZero = /^[A-F]/.test(b);
+        lines.push(`MVI A, ${needsZero ? '0' : ''}${b}H`);
+        lines.push(`STA ${addr}H`);
+    }
+    return lines.join('\n');
+}
+
+document.getElementById('btnGen').addEventListener('click', () => {
+    const errBox = document.getElementById('errBox');
+    const resultCard = document.getElementById('resultCard');
+    errBox.classList.add('hidden');
+
+    const a = parseFloat(document.getElementById('valA').value);
+    const b = parseFloat(document.getElementById('valB').value);
+    const totalPrev = parseInt(document.getElementById('totalPrev').value, 10);
+    const opCode = document.getElementById('op').value;
+    const opNames = { '01': 'suma', '02': 'resta', '03': 'multiplicacion', '04': 'division' };
+
+    if (isNaN(a) || isNaN(b) || isNaN(totalPrev)) {
+        errBox.textContent = 'Revisa que A, B y el total previo sean números válidos.';
+        errBox.classList.remove('hidden');
+        resultCard.classList.add('hidden');
+        return;
+    }
+    if (totalPrev < 0 || totalPrev > 255) {
+        errBox.textContent = 'El total previo debe estar entre 0 y 255 (un registro de 8 bits).';
+        errBox.classList.remove('hidden');
+        resultCard.classList.add('hidden');
+        return;
+    }
+
+    const bytesA = floatToBytes(a);
+    const bytesB = floatToBytes(b);
+
+    let expected;
+    let divError = false;
+    switch (opCode) {
+        case '01': expected = a + b; break;
+        case '02': expected = a - b; break;
+        case '03': expected = a * b; break;
+        case '04':
+            if (b === 0) { divError = true; expected = 0; }
+            else expected = a / b;
+            break;
+    }
+
+    if (divError) {
+        errBox.textContent = 'B es 0: la división marcará ERROR en el coprocesador (bandera 9009H, bit1). El código igual se genera para que puedas probarlo.';
+        errBox.classList.remove('hidden');
+    }
+
+    const intResult = Math.min(255, Math.trunc(Math.abs(expected)));
+    const totalFinal = (totalPrev + intResult) & 0xFF;
+    const overflowed = (totalPrev + intResult) > 255;
+
+    const code = `; Generado para A=${a}, B=${b}, operacion=${opNames[opCode]}
+; total previo=${totalPrev}
+
+MVI A, ${hx(totalPrev)}H
+STA 900FH
+
+; Operando A = ${a}
+${genBlock(bytesA, 0x9000)}
+
+; Operando B = ${b}
+${genBlock(bytesB, 0x9004)}
+
+; comando -> dispara la FPU
+MVI A, ${opCode}H
+STA 9008H
+
+LDA 900EH
+MOV B, A
+LDA 900FH
+ADD B
+STA 900FH
+
+HLT`;
+
+    document.getElementById('output').textContent = code;
+    let summaryHtml =
+        `Resultado del coprocesador: <b>${expected.toFixed(4)}</b> &nbsp;|&nbsp; ` +
+        `Parte entera: <b>${intResult}</b> &nbsp;|&nbsp; ` +
+        `Total final esperado en 900FH: <b>${totalFinal}</b>`;
+    if (overflowed) {
+        summaryHtml += `<br><span style="color:#dc2626;">Ojo: ${totalPrev} + ${intResult} pasa de 255, el registro de 8 bits se desborda (ADD no arrastra el acarreo solo). El valor real que quedará es ${totalFinal}, no ${totalPrev + intResult}.</span>`;
+    }
+    document.getElementById('summary').innerHTML = summaryHtml;
+    resultCard.classList.remove('hidden');
+});
+
+document.getElementById('btnCopy').addEventListener('click', () => {
+    const text = document.getElementById('output').textContent;
+    navigator.clipboard.writeText(text).then(() => {
+        const btn = document.getElementById('btnCopy');
+        const original = btn.textContent;
+        btn.textContent = 'Copiado';
+        setTimeout(() => { btn.textContent = original; }, 1200);
+    });
+});
+</script>
+</body>
+</html>
