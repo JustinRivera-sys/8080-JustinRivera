@@ -149,7 +149,7 @@ function renderMemory() {
             if (cellAddr === cpu.registers.pc) c.style.backgroundColor = '#fde047';
             if (cpu.fpu && cellAddr >= 0x9000 && cellAddr <= 0x900F) {
                 c.classList.add('mem-fpu-zone');
-                c.title = 'Zona de memoria compartida con el coprocesador FPU';
+                c.title = 'Zona compartida FPU';
             }
             c.textContent = cpu.readMemory(cellAddr).toString(16).toUpperCase().padStart(2, '0');
             table.appendChild(c);
@@ -182,19 +182,13 @@ document.getElementById('btn-clear-code').addEventListener('click', () => {
 });
 
 document.getElementById('btn-fpu-demo').addEventListener('click', () => {
-    const demo = `; ==========================================================
-; DEMO: Coprocesador de Punto Flotante (memoria compartida)
-; El 8080 y el coprocesador comparten la misma memoria (9000H-900FH).
-; Calcula 10.01 + 10.02 con el coprocesador, y el 8080 toma la parte
-; entera del resultado (20) y la suma a un total entero que ya tenia (5).
-; Total final esperado = 5 + 20 = 25
-; ==========================================================
+    const demo = `; Coprocesador FPU - memoria compartida 9000H-900FH
+; 10.01 + 10.02, resultado entero + total previo = 25
 
-; --- El 8080 ya tenia un total acumulado = 5 (900FH) ---
 MVI A, 05H
 STA 900FH
 
-; --- Escribir Operando A = 10.01 en 9000H-9003H (IEEE-754: F6 28 20 41) ---
+; Operando A = 10.01 (F6 28 20 41)
 MVI A, 0F6H
 STA 9000H
 MVI A, 28H
@@ -204,7 +198,7 @@ STA 9002H
 MVI A, 41H
 STA 9003H
 
-; --- Escribir Operando B = 10.02 en 9004H-9007H (IEEE-754: EC 51 20 41) ---
+; Operando B = 10.02 (EC 51 20 41)
 MVI A, 0ECH
 STA 9004H
 MVI A, 51H
@@ -214,26 +208,21 @@ STA 9006H
 MVI A, 41H
 STA 9007H
 
-; --- Escribir el comando en 9008H: esto DISPARA al coprocesador ---
-; El coprocesador lee 9000H-9007H, calcula 10.01 + 10.02 = 20.03,
-; y deja el resultado en 900AH-900DH y su parte entera (20) en 900EH.
+; comando -> dispara la FPU
 MVI A, 01H
 STA 9008H
 
-; --- El 8080 lee la parte entera del resultado del coprocesador ---
 LDA 900EH
 MOV B, A
-
-; --- Y la suma al total entero que ya llevaba ---
 LDA 900FH
 ADD B
-STA 900FH   ; Total final = 5 + 20 = 25
+STA 900FH
 
 HLT`;
     document.getElementById('code-editor').value = demo;
     const output = document.getElementById('assembler-output');
     if (output) {
-        output.textContent = 'Demo FPU (memoria compartida) cargado. Presiona "Assemble & Load" y luego "Run" o "Step".';
+        output.textContent = 'Demo cargado. Assemble & Load y luego Run o Step.';
         output.className = '';
     }
 });

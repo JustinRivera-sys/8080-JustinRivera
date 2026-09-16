@@ -6,7 +6,7 @@ if (typeof module !== 'undefined' && typeof FPU8087 === 'undefined') {
 class Intel8080 {
     constructor() {
         this.memory = new Uint8Array(65536);
-        this.fpu = new FPU8087(this.memory); // Coprocesador de punto flotante (memoria compartida)
+        this.fpu = new FPU8087(this.memory);
         this.reset();
     }
 
@@ -114,10 +114,6 @@ class Intel8080 {
         val &= 0xFF;
         this.memory[addr] = val;
 
-        // Memoria compartida CPU <-> Coprocesador: si la CPU acaba de escribir
-        // en la direccion de "comando" (9008H), el coprocesador reacciona de
-        // inmediato, leyendo los operandos y dejando el resultado en otra
-        // seccion de esta MISMA memoria (900AH en adelante).
         if (this.fpu && this.fpu.isTriggerAddress(addr)) {
             this.fpu.compute(val);
         }
@@ -285,8 +281,8 @@ class Intel8080 {
             case 0x3F: this.flags.cy = !this.flags.cy; break; // CMC
 
             // Special
-            case 0xDB: this.fetch(); break; // IN (no usado en este diseño de memoria compartida)
-            case 0xD3: this.fetch(); break; // OUT (no usado en este diseño de memoria compartida)
+            case 0xDB: this.fetch(); break; // IN (Ignored for now)
+            case 0xD3: this.fetch(); break; // OUT (Ignored for now)
             case 0xFB: break; // EI
             case 0xF3: break; // DI
         }

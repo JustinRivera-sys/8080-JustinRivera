@@ -95,8 +95,8 @@ HLT"></textarea>
                 </div>
 
                 <div class="card fpu">
-                    <h3>FPU Coprocessor <span class="fpu-badge">Conceptual — memoria compartida con la CPU (9000H-900FH)</span></h3>
-                    <p class="fpu-explainer">La CPU y el coprocesador leen y escriben las mismas celdas de memoria. La CPU escribe los operandos y el comando; el coprocesador calcula y deja el resultado en otra sección de esa misma memoria para que la CPU lo lea después.</p>
+                    <h3>FPU Coprocessor <span class="fpu-badge">memoria compartida 9000H-900FH</span></h3>
+                    <p class="fpu-explainer">CPU y coprocesador leen/escriben las mismas direcciones. La CPU pone operandos y comando; la FPU calcula y deja el resultado en otra parte de esa misma memoria.</p>
                     <div class="fpu-jump-row">
                         <button class="fpu-jump-btn" data-addr="9000">Operando A (9000H)</button>
                         <button class="fpu-jump-btn" data-addr="9004">Operando B (9004H)</button>
@@ -126,10 +126,10 @@ HLT"></textarea>
                         </div>
                     </div>
                     <div class="fpu-status-row">
-                        <div class="flag-box" title="READY: 1 = el coprocesador terminó la última operación y el resultado está disponible."><span>READY</span><div id="fpu-ready">1</div></div>
-                        <div class="flag-box" title="ERROR: 1 = error en la última operación (ej. división por cero)."><span>ERROR</span><div id="fpu-error">0</div></div>
-                        <div class="flag-box" title="Parte entera truncada del resultado (900EH), lista para que el 8080 la sume."><span>RESULTADO ENTERO</span><div id="fpu-res-int">0</div></div>
-                        <div class="flag-box" title="Total entero acumulado por el programa 8080 (900FH), despues de sumar el resultado del coprocesador."><span>TOTAL ENTERO (CPU)</span><div id="fpu-total">0</div></div>
+                        <div class="flag-box" title="1 = resultado listo"><span>READY</span><div id="fpu-ready">1</div></div>
+                        <div class="flag-box" title="1 = error (div. por cero)"><span>ERROR</span><div id="fpu-error">0</div></div>
+                        <div class="flag-box" title="900EH, parte entera del resultado"><span>RESULTADO ENTERO</span><div id="fpu-res-int">0</div></div>
+                        <div class="flag-box" title="900FH, total acumulado por el 8080"><span>TOTAL ENTERO (CPU)</span><div id="fpu-total">0</div></div>
                     </div>
                 </div>
             </div>
